@@ -14,17 +14,18 @@ class Stream {
         this.peak = peak
 
         this.x = x
-        
-        var boundaryX = bounds;
-        var boundaryZ = bounds;
 
-
-        var xrand = 100.0
+        var xrand = 50.0
         var dx = []
         dx.push( Math.random() * xrand - xrand/2 )
         dx.push( Math.random() * xrand - xrand/2 )
         dx.push( Math.random() * xrand - xrand/2 )
         dx.push( Math.random() * xrand - xrand/2 )
+        
+        var boundaryX = bounds;
+        var boundaryZ = bounds;
+
+
         
 
         this.curve = new THREE.CubicBezierCurve3(
@@ -66,6 +67,10 @@ class Stream {
 
     }
 
+    getPeak() {
+        return this.peak;
+    }
+
     change() {
 
         this.starttime = -999
@@ -78,6 +83,13 @@ class Stream {
         geometry.vertices = points
         this.stream.geometry = geometry;
         this.stream.geometry.needsUpdate = true;
+    }
+
+    changeVisibility(isVisible) {
+        this.stream.material.visible = isVisible;
+        this.stream.material.needsUpdate = true;
+        this.point.material.visible = isVisible;
+        this.point.material.needsUpdate = true;
     }
 
     remove(scene) {

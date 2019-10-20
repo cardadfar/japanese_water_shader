@@ -10,6 +10,7 @@
 
 		<script src="three.js"></script>
 		<script src="helpers/curve.js"></script>
+		<script src="modules/OBJLoader.js"></script>
 
 
 
@@ -18,9 +19,9 @@
 
 			#include <common>
 
-			uniform float burstPosX[100];
-			uniform float burstPosY[100];
-			uniform vec2 mousePos;
+			uniform float burstPosX[150];
+			uniform float burstPosY[150];
+			uniform float burstPosH[150];
 			uniform float radius;
 			uniform float viscosityConstant;
 			uniform float heightCompensation;
@@ -47,8 +48,8 @@
 
 				// Mouse influence
 				float mousePhase = 0.0;
-				for(int i = 0; i < 99; i++) {
-					mousePhase += clamp( length( ( uv - vec2( 0.5 ) ) * BOUNDS - vec2( burstPosX[i], - burstPosY[i] ) ) * PI / radius, 0.0, PI );
+				for(int i = 0; i < 149; i++) {
+					mousePhase += clamp( length( ( uv - vec2( 0.5 ) ) * BOUNDS - vec2( burstPosX[i], - burstPosY[i] ) ) * PI / radius , 0.0, PI );
 				}
 				newHeight += ( cos( mousePhase ) + 1.0 ) * 1.5;
 
@@ -291,6 +292,9 @@
 			import { GPUComputationRenderer } from './GPUComputationRenderer.js';
 			import { SimplexNoise } from './SimplexNoise.js';
 
+			import { OBJLoader } from './modules/OBJLoader.js';
+
+
 			// Texture width for simulation
 			var WIDTH = 128;
 
@@ -333,9 +337,11 @@
 					segments: 127,
 					radius: 20.0,
 					viscosity: 0.98,
-					spheresEnabled: spheresEnabled,
+					boatsEnabled: spheresEnabled,
+					boatSize: 5,
 					pause: false,
 					wireframe: false,
+					burstPaths: false,
 					normals: false,
 				};
 
@@ -347,8 +353,8 @@
 				container = document.createElement( 'div' );
 				document.body.appendChild( container );
 
-				camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 1, 3000 );
-				camera.position.set( 0, 200, 350 );
+				camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 1, 1000 );
+				camera.position.set( 325, 100, 325 );
 
 				scene = new THREE.Scene();
 
@@ -387,11 +393,15 @@
 					
 					heightmapVariable.material.uniforms[ "radius" ].value = effectController.radius;
 					heightmapVariable.material.uniforms[ "viscosityConstant" ].value = effectController.viscosity;
-					spheresEnabled = effectController.spheresEnabled;
+					spheresEnabled = effectController.boatsEnabled;
 					for ( var i = 0; i < NUM_SPHERES; i ++ ) {
 						if ( spheres[ i ] ) {
 							spheres[ i ].visible = spheresEnabled;
 						}
+					}
+
+					for ( var i = 0; i < stream.length; i++ ) {
+						stream[i].changeVisibility( effectController.burstPaths );
 					}
 
 				};
@@ -400,9 +410,11 @@
 				gui.add( effectController, "segments", 10.0, 300.0, 1.0 ).onChange( valuesChanger );
 				gui.add( effectController, "radius", 1.0, 100.0, 1.0 ).onChange( valuesChanger );
 				gui.add( effectController, "viscosity", 0.9, 0.999, 0.001 ).onChange( valuesChanger );
-				gui.add( effectController, "spheresEnabled", 0, 1, 1 ).onChange( valuesChanger );
+				gui.add( effectController, "boatsEnabled", 0, 1, 1 ).onChange( valuesChanger );
+				gui.add( effectController, "boatSize", 1.0, 20.0, 0.5 ).onChange( valuesChanger );
 				gui.add( effectController, "pause");
 				gui.add( effectController, "wireframe").onChange( valuesChanger );
+				gui.add( effectController, "burstPaths").onChange( valuesChanger );
 				gui.add( effectController, "normals").onChange( valuesChanger );
 				var buttonSmooth = {
 					smoothWater: function () {
@@ -447,7 +459,8 @@
 					] ),
 					vertexShader: document.getElementById( 'waterVertexShader' ).textContent,
 					fragmentShader: document.getElementById( 'colorFragmentShader' ).textContent,
-
+					side: THREE.DoubleSide,
+					smoothShading: true,
 				} );
 
 				material.lights = true;
@@ -503,14 +516,16 @@
 				
 				var burstPosX = []
 				var burstPosY = []
-				for( var i = 0; i < 99; i++ ) {
-					burstPosX.push( Math.random() * 200 )
-					burstPosY.push( Math.random() * 200 )
+				var burstPosH = []
+				for( var i = 0; i < 150; i++ ) {
+					burstPosX.push( -1000 )
+					burstPosY.push( -1000 )
+					burstPosH.push( 0 )
 				}
 
 				heightmapVariable.material.uniforms[ "burstPosX" ] = { value: burstPosX };
 				heightmapVariable.material.uniforms[ "burstPosY" ] = { value: burstPosY };
-				heightmapVariable.material.uniforms[ "mousePos" ] = { value: new THREE.Vector2( 10000, 10000 ) };
+				heightmapVariable.material.uniforms[ "burstPosH" ] = { value: burstPosH };
 				heightmapVariable.material.uniforms[ "radius" ] = { value: 20.0 };
 				heightmapVariable.material.uniforms[ "viscosityConstant" ] = { value: 0.98 };
 				heightmapVariable.material.uniforms[ "heightCompensation" ] = { value: 0 };
@@ -551,13 +566,15 @@
 
 				var guide = []
 				guide.push( new THREE.Vector3( 0, 0, -1   ) )
-				guide.push( new THREE.Vector3( 0, 0, 1/2 ) )
+				guide.push( new THREE.Vector3( 0, 0, 1/4 ) )
 				guide.push( new THREE.Vector3( 0, 0, 1/2  ) ) 
 				guide.push( new THREE.Vector3( 0, 0, 1    ) )
 
 				for(var i = -300; i < 300; i += 5) {
 					var lifetime = 1*(Math.random() + 0.25)
-					stream.push( new Stream(scene, guide, lifetime, lifetime*Math.random(), i, BOUNDS, 50 ) );
+					var newStream = new Stream(scene, guide, lifetime, lifetime*Math.random(), i, BOUNDS, 1.0 );
+					newStream.changeVisibility( effectController.burstPaths );
+					stream.push( newStream );
 				}
 
 
@@ -625,27 +642,47 @@
 
 			function createSpheres() {
 
-				var sphereTemplate = new THREE.Mesh( new THREE.SphereBufferGeometry( 4, 24, 12 ), new THREE.MeshPhongMaterial( { color: 0xFFFF00 } ) );
+				
+				var objLoader = new OBJLoader();
+				objLoader.load("assets/boat.obj", function ( object ) {
 
-				for ( var i = 0; i < NUM_SPHERES; i ++ ) {
+					var materialObj = new THREE.MeshLambertMaterial({ color: 0x9c7f32 });
+					object.traverse(function(child) {
+						if (child instanceof THREE.Mesh) {
+							child.material = materialObj;
+						}
+					});
+					
 
-					var sphere = sphereTemplate;
-					if ( i < NUM_SPHERES - 1 ) {
+					var sphereTemplate = object;
 
-						sphere = sphereTemplate.clone();
+					for ( var i = 0; i < NUM_SPHERES; i ++ ) {
+
+						var sphere = sphereTemplate;
+						if ( i < NUM_SPHERES - 1 ) {
+
+							sphere = sphereTemplate.clone();
+
+						}
+
+						
+						sphere.position.x = ( Math.random() - 0.5 ) * BOUNDS * 0.7;
+						sphere.position.z = ( Math.random() - 0.5 ) * BOUNDS * 0.7;
+
+
+						sphere.userData.velocity = new THREE.Vector3();
+
+						sphere.scale.x = effectController.boatSize;
+						sphere.scale.y = effectController.boatSize;
+						sphere.scale.z = effectController.boatSize;
+
+						scene.add( sphere );
+
+						spheres[ i ] = sphere;
 
 					}
-
-					sphere.position.x = ( Math.random() - 0.5 ) * BOUNDS * 0.7;
-					sphere.position.z = ( Math.random() - 0.5 ) * BOUNDS * 0.7;
-
-					sphere.userData.velocity = new THREE.Vector3();
-
-					scene.add( sphere );
-
-					spheres[ i ] = sphere;
-
-				}
+				}); 
+				
 
 			}
 
@@ -655,6 +692,7 @@
 
 				readWaterLevelShader.uniforms[ "levelTexture" ].value = currentRenderTarget.texture;
 
+				
 				for ( var i = 0; i < NUM_SPHERES; i ++ ) {
 
 					var sphere = spheres[ i ];
@@ -672,6 +710,16 @@
 
 						// Get orientation
 						waterNormal.set( pixels[ 1 ], 0, - pixels[ 2 ] );
+						
+						// Damp water normals and apply euclidean rotation
+						var rotationDamp = 0.15
+						sphere.rotation.x = - waterNormal.x * rotationDamp;
+						sphere.rotation.y =   waterNormal.y * rotationDamp;
+						sphere.rotation.z =   waterNormal.z * rotationDamp;
+
+						sphere.scale.x = effectController.boatSize;
+						sphere.scale.y = effectController.boatSize;
+						sphere.scale.z = effectController.boatSize;
 
 						var pos = sphere.position;
 
@@ -684,26 +732,29 @@
 						sphere.userData.velocity.multiplyScalar( 0.998 );
 						pos.add( sphere.userData.velocity );
 
-						if ( pos.x < - BOUNDS_HALF ) {
+						var sphere_dx = effectController.boatSize * 1;
+						var sphere_dz = effectController.boatSize * 4;
 
-							pos.x = - BOUNDS_HALF + 0.001;
+						if ( pos.x < - BOUNDS_HALF + sphere_dx ) {
+
+							pos.x = - BOUNDS_HALF + sphere_dx + 0.001;
 							sphere.userData.velocity.x *= - 0.3;
 
-						} else if ( pos.x > BOUNDS_HALF ) {
+						} else if ( pos.x > BOUNDS_HALF - sphere_dx) {
 
-							pos.x = BOUNDS_HALF - 0.001;
+							pos.x = BOUNDS_HALF - sphere_dx - 0.001;
 							sphere.userData.velocity.x *= - 0.3;
 
 						}
 
-						if ( pos.z < - BOUNDS_HALF ) {
+						if ( pos.z < - BOUNDS_HALF + sphere_dz) {
 
-							pos.z = - BOUNDS_HALF + 0.001;
+							pos.z = - BOUNDS_HALF + sphere_dz + 0.001;
 							sphere.userData.velocity.z *= - 0.3;
 
-						} else if ( pos.z > BOUNDS_HALF ) {
+						} else if ( pos.z > BOUNDS_HALF - sphere_dz) {
 
-							pos.z = BOUNDS_HALF - 0.001;
+							pos.z = BOUNDS_HALF - sphere_dz - 0.001;
 							sphere.userData.velocity.z *= - 0.3;
 
 						}
@@ -746,9 +797,6 @@
 				
 						// Set uniforms: mouse interaction
 					var uniforms = heightmapVariable.material.uniforms;
-					var mouseVal = uniforms[ "mousePos" ].value
-					var mouseValx = ((mouseVal.x + 20*Math.random()-10) % 500)
-					var mouseValy = ((mouseVal.y + 20*Math.random()-10) % 500)
 
 					if ( mouseMoved ) {
 
@@ -759,7 +807,6 @@
 						if ( intersects.length > 0 ) {
 
 							var point = intersects[ 0 ].point;
-							//uniforms[ "mousePos" ].value.set( point.x, point.z );
 
 						} 
 
@@ -780,15 +827,18 @@
 					waterUniforms[ "heightmap" ].value = gpuCompute.getCurrentRenderTarget( heightmapVariable ).texture;
 					var burstPosX = []
 					var burstPosY = []
+					var burstPosH = []
 					time += effectController.timestep;
 					for(var i = 0; i < stream.length; i++) {
 						var burstPos = stream[i].update(time)
 						burstPosX.push( burstPos.x )
 						burstPosY.push( burstPos.z )
+						burstPosH.push( stream[i].getPeak() )
 					}
 					
 					uniforms[ "burstPosX" ].value = burstPosX ;
 					uniforms[ "burstPosY" ].value = burstPosY ;
+					uniforms[ "burstPosH" ].value = burstPosH ;
 				}
 
 				// Render
