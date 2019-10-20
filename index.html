@@ -4,7 +4,7 @@
 		<title>three.js webgl - gpgpu - water</title>
 		<meta charset="utf-8">
 		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
-		<link type="text/css" rel="stylesheet" href="main.css">
+		<link type="text/css" rel="stylesheet" href="style.css">
 	</head>
 	<body>
 
@@ -18,8 +18,10 @@
 
 			#include <common>
 
+			uniform float burstPosX[100];
+			uniform float burstPosY[100];
 			uniform vec2 mousePos;
-			uniform float mouseSize;
+			uniform float radius;
 			uniform float viscosityConstant;
 			uniform float heightCompensation;
 
@@ -41,10 +43,13 @@
 				vec4 west = texture2D( heightmap, uv + vec2( - cellSize.x, 0.0 ) );
 
 
-				float newHeight = ( ( north.x + south.x + east.x + west.x ) * 0.5 - heightmapValue.y ) * 0.95 + heightmapValue.x * 0.04;
+				float newHeight = ( ( north.x + south.x + east.x + west.x ) * 0.5 - heightmapValue.y ) * 0.3 + heightmapValue.x * 0.65;
 
 				// Mouse influence
-				float mousePhase = clamp( length( ( uv - vec2( 0.5 ) ) * BOUNDS - vec2( mousePos.x, - mousePos.y ) ) * PI / mouseSize, 0.0, PI );
+				float mousePhase = 0.0;
+				for(int i = 0; i < 99; i++) {
+					mousePhase += clamp( length( ( uv - vec2( 0.5 ) ) * BOUNDS - vec2( burstPosX[i], - burstPosY[i] ) ) * PI / radius, 0.0, PI );
+				}
 				newHeight += ( cos( mousePhase ) + 1.0 ) * 1.5;
 
 				heightmapValue.y = heightmapValue.x;
@@ -89,8 +94,6 @@
 			uniform vec2 point1;
 
 			uniform sampler2D levelTexture;
-
-			// Integer to float conversion from https://stackoverflow.com/questions/17981163/webgl-read-pixels-from-floating-point-render-target
 
 			float shift_right( float v, float amt ) {
 
@@ -172,6 +175,7 @@
 		<script id="colorFragmentShader" type="x-shader/x-fragment">
 
 			varying vec3 vUv;
+			varying vec3 vUv_normal;
 
 			uniform vec3 colorA; 
 			uniform vec3 colorB; 
@@ -180,11 +184,11 @@
 
 			void main()	{
 
-				if(vUv.z > 20.0)
+				if(vUv.z > 5.0 && abs(vUv_normal.x) < 0.9 )
 					gl_FragColor = vec4(colorA, 1.0);
-				else if(vUv.z > 2.0)
+				else if(vUv.z > 3.0)
 					gl_FragColor = vec4(colorB, 1.0);
-				else if(vUv.z > 0.5)
+				else if(vUv.z > 1.0)
 					gl_FragColor = vec4(colorC, 1.0);
 				else
 					gl_FragColor = vec4(colorD, 1.0);
@@ -202,6 +206,7 @@
 
 			varying vec3 vViewPosition;
 			varying vec3 vUv;
+			varying vec3 vUv_normal;
 
 			#ifndef FLAT_SHADED
 
@@ -235,6 +240,7 @@
 					( texture2D( heightmap, uv + vec2( - cellSize.x, 0 ) ).x - texture2D( heightmap, uv + vec2( cellSize.x, 0 ) ).x ) * WIDTH / BOUNDS,
 					( texture2D( heightmap, uv + vec2( 0, - cellSize.y ) ).x - texture2D( heightmap, uv + vec2( 0, cellSize.y ) ).x ) * WIDTH / BOUNDS,
 					1.0 );
+				vUv_normal = objectNormal;
 				//<beginnormal_vertex>
 
 				#include <morphnormal_vertex>
@@ -308,6 +314,7 @@
 			var readWaterLevelRenderTarget;
 			var readWaterLevelImage;
 			var waterNormal = new THREE.Vector3();
+			var normalHelper;
 
 			var NUM_SPHERES = 5;
 			var spheres = [];
@@ -322,11 +329,14 @@
 
 			var effectController = {
 					timestep: 0.005,
-					mouseSize: 20.0,
+					bounds: 512,
+					segments: 127,
+					radius: 20.0,
 					viscosity: 0.98,
 					spheresEnabled: spheresEnabled,
 					pause: false,
 					wireframe: false,
+					normals: false,
 				};
 
 			init();
@@ -362,10 +372,20 @@
 
 				var valuesChanger = function () {
 
+					BOUNDS = effectController.bounds;
+					BOUNDS_HALF = BOUNDS * 0.5;
+					WIDTH = effectController.segments;
+					var geometry = new THREE.PlaneBufferGeometry( BOUNDS, BOUNDS, WIDTH - 1, WIDTH - 1 );
+					waterMesh.geometry = geometry
+					waterMesh.geometry.needsUpdate = true;
+
 					waterMesh.material.wireframe = effectController.wireframe;
 					waterMesh.material.needsUpdate = true;
+
+					normalHelper.visible = effectController.normals;
+					normalHelper.needsUpdate = true;
 					
-					heightmapVariable.material.uniforms[ "mouseSize" ].value = effectController.mouseSize;
+					heightmapVariable.material.uniforms[ "radius" ].value = effectController.radius;
 					heightmapVariable.material.uniforms[ "viscosityConstant" ].value = effectController.viscosity;
 					spheresEnabled = effectController.spheresEnabled;
 					for ( var i = 0; i < NUM_SPHERES; i ++ ) {
@@ -376,11 +396,14 @@
 
 				};
 
-				gui.add( effectController, "mouseSize", 1.0, 100.0, 1.0 ).onChange( valuesChanger );
+				gui.add( effectController, "bounds", 100, 1000, 5.0 ).onChange( valuesChanger );
+				gui.add( effectController, "segments", 10.0, 300.0, 1.0 ).onChange( valuesChanger );
+				gui.add( effectController, "radius", 1.0, 100.0, 1.0 ).onChange( valuesChanger );
 				gui.add( effectController, "viscosity", 0.9, 0.999, 0.001 ).onChange( valuesChanger );
 				gui.add( effectController, "spheresEnabled", 0, 1, 1 ).onChange( valuesChanger );
 				gui.add( effectController, "pause");
 				gui.add( effectController, "wireframe").onChange( valuesChanger );
+				gui.add( effectController, "normals").onChange( valuesChanger );
 				var buttonSmooth = {
 					smoothWater: function () {
 
@@ -453,6 +476,10 @@
 
 				scene.add( waterMesh );
 
+				normalHelper = new THREE.VertexNormalsHelper( waterMesh , 2, 0xff0000, 1 );
+				normalHelper.visible = false;
+				scene.add( normalHelper ); 
+
 				// THREE.Mesh just for mouse raycasting
 				var geometryRay = new THREE.PlaneBufferGeometry( BOUNDS, BOUNDS, 1, 1 );
 				meshRay = new THREE.Mesh( geometryRay, new THREE.MeshBasicMaterial( { color: 0xFFFFFF, visible: false } ) );
@@ -473,9 +500,18 @@
 				heightmapVariable = gpuCompute.addVariable( "heightmap", document.getElementById( 'heightmapFragmentShader' ).textContent, heightmap0 );
 
 				gpuCompute.setVariableDependencies( heightmapVariable, [ heightmapVariable ] );
+				
+				var burstPosX = []
+				var burstPosY = []
+				for( var i = 0; i < 99; i++ ) {
+					burstPosX.push( Math.random() * 200 )
+					burstPosY.push( Math.random() * 200 )
+				}
 
+				heightmapVariable.material.uniforms[ "burstPosX" ] = { value: burstPosX };
+				heightmapVariable.material.uniforms[ "burstPosY" ] = { value: burstPosY };
 				heightmapVariable.material.uniforms[ "mousePos" ] = { value: new THREE.Vector2( 10000, 10000 ) };
-				heightmapVariable.material.uniforms[ "mouseSize" ] = { value: 20.0 };
+				heightmapVariable.material.uniforms[ "radius" ] = { value: 20.0 };
 				heightmapVariable.material.uniforms[ "viscosityConstant" ] = { value: 0.98 };
 				heightmapVariable.material.uniforms[ "heightCompensation" ] = { value: 0 };
 				heightmapVariable.material.defines.BOUNDS = BOUNDS.toFixed( 1 );
@@ -515,13 +551,13 @@
 
 				var guide = []
 				guide.push( new THREE.Vector3( 0, 0, -1   ) )
-				guide.push( new THREE.Vector3( -1/2, 0, 1/2 ) )
-				guide.push( new THREE.Vector3( 1/2, 0, 1/2  ) ) 
+				guide.push( new THREE.Vector3( 0, 0, 1/2 ) )
+				guide.push( new THREE.Vector3( 0, 0, 1/2  ) ) 
 				guide.push( new THREE.Vector3( 0, 0, 1    ) )
 
 				for(var i = -300; i < 300; i += 5) {
 					var lifetime = 1*(Math.random() + 0.25)
-					stream.push( new Stream(scene, guide, lifetime, lifetime*Math.random(), i, 50 ) );
+					stream.push( new Stream(scene, guide, lifetime, lifetime*Math.random(), i, BOUNDS, 50 ) );
 				}
 
 
@@ -742,13 +778,17 @@
 
 					// Get compute output in custom uniform
 					waterUniforms[ "heightmap" ].value = gpuCompute.getCurrentRenderTarget( heightmapVariable ).texture;
-					bursts = []
+					var burstPosX = []
+					var burstPosY = []
 					time += effectController.timestep;
-					for(var i = 0; i < stream.length; i++) 
-						bursts.push( stream[i].update(time) )
+					for(var i = 0; i < stream.length; i++) {
+						var burstPos = stream[i].update(time)
+						burstPosX.push( burstPos.x )
+						burstPosY.push( burstPos.z )
+					}
 					
-					
-					uniforms[ "mousePos" ].value.set( bursts[50].x , bursts[50].z );
+					uniforms[ "burstPosX" ].value = burstPosX ;
+					uniforms[ "burstPosY" ].value = burstPosY ;
 				}
 
 				// Render

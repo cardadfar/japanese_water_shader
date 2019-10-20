@@ -1,6 +1,6 @@
 class Stream {
 
-    constructor(scene, guide, lifetime, starttime, x, peak) {
+    constructor(scene, guide, lifetime, starttime, x, bounds, peak) {
         /* curve - reference to curve
          * stream - reference to line
          * point - reference to point
@@ -15,16 +15,16 @@ class Stream {
 
         this.x = x
         
-        var boundaryX = 500;
-        var boundaryZ = 500;
+        var boundaryX = bounds;
+        var boundaryZ = bounds;
 
 
         var xrand = 100.0
         var dx = []
-        dx.push( Math.random() * xrand )
-        dx.push( Math.random() * xrand )
-        dx.push( Math.random() * xrand )
-        dx.push( Math.random() * xrand )
+        dx.push( Math.random() * xrand - xrand/2 )
+        dx.push( Math.random() * xrand - xrand/2 )
+        dx.push( Math.random() * xrand - xrand/2 )
+        dx.push( Math.random() * xrand - xrand/2 )
         
 
         this.curve = new THREE.CubicBezierCurve3(
@@ -69,9 +69,6 @@ class Stream {
     change() {
 
         this.starttime = -999
-
-        var boundaryX = 500;
-        var boundaryZ = 500;
 
         //this.curve.v0 = new THREE.Vector3( this.x, 0, -boundaryZ/2);
         //this.curve.v3 = new THREE.Vector3( this.x, 0, boundaryZ/2);
