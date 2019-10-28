@@ -49,11 +49,11 @@
 				// Mouse influence
 				float mousePhase = 0.0;
 				float mousePhaseInf = 0.0;
-				vec2 mousePhaseVec = vec2( 0.0 );
+				vec2 influence = vec2(3.0, 0.2);
 				for(int i = 0; i < 149; i++) {
+					float peak = burstPosH[i];
 					mousePhase += clamp( length( ( uv - vec2( 0.5 ) ) * BOUNDS - vec2( burstPosX[i], - burstPosY[i] ) ) * PI / radius , 0.0, PI );
-					mousePhaseInf += clamp( length( vec2(3.0, 0.2) * ( ( uv - vec2( 0.5 ) ) * BOUNDS - vec2( burstPosX[i], - burstPosY[i] ) ) ) * PI / radius , 0.0, PI );
-					mousePhaseVec += clamp( ( ( uv - vec2( 0.5 ) ) * BOUNDS - vec2( burstPosX[i], - burstPosY[i] ) ) * PI / radius , 0.0, PI );
+					mousePhaseInf += clamp( peak * length( influence * ( ( uv - vec2( 0.5 ) ) * BOUNDS - vec2( burstPosX[i], - burstPosY[i] ) ) ) * PI / radius , 0.0, PI );
 				}
 
 				newHeight += ( cos( mousePhaseInf ) + 1.0 ) * 1.5;
@@ -525,7 +525,7 @@
 				for( var i = 0; i < 150; i++ ) {
 					burstPosX.push( -1000 )
 					burstPosY.push( -1000 )
-					burstPosH.push( 0 )
+					burstPosH.push( 1.0 )
 				}
 
 				heightmapVariable.material.uniforms[ "burstPosX" ] = { value: burstPosX };
@@ -575,9 +575,10 @@
 				guide.push( new THREE.Vector3( 0, 0, 1/2  ) ) 
 				guide.push( new THREE.Vector3( 0, 0, 1    ) )
 
-				for(var i = -300; i < 300; i += 5) {
+				
+				for(var i = -300; i < 300; i += 7) {
 					var lifetime = 1*(Math.random() + 0.25)
-					var newStream = new Stream(scene, guide, lifetime, lifetime*Math.random(), i, BOUNDS, 1.0 );
+					var newStream = new Stream(scene, guide, lifetime, lifetime*Math.random(), i, BOUNDS, Math.random()+0.5 );
 					newStream.changeVisibility( effectController.burstPaths );
 					stream.push( newStream );
 				}
@@ -718,7 +719,7 @@
 						
 						// Damp water normals and apply euclidean rotation
 						var rotationDamp = 0.15
-						sphere.rotation.x = - waterNormal.x * rotationDamp;
+						sphere.rotation.x =   waterNormal.x * rotationDamp;
 						sphere.rotation.y =   waterNormal.y * rotationDamp;
 						sphere.rotation.z =   waterNormal.z * rotationDamp;
 
