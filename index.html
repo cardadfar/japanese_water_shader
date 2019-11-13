@@ -25,6 +25,7 @@
 			uniform float radius;
 			uniform float viscosityConstant;
 			uniform float heightCompensation;
+	
 
 			void main()	{
 
@@ -49,14 +50,24 @@
 				// Mouse influence
 				float mousePhase = 0.0;
 				float mousePhaseInf = 0.0;
-				vec2 influence = vec2(3.0, 0.2);
+				float closestLength = 99999.0;
+				vec2 influence = vec2(1.0, 1.0);
 				for(int i = 0; i < 149; i++) {
 					float peak = burstPosH[i];
+					peak = 0.8;
 					mousePhase += clamp( length( ( uv - vec2( 0.5 ) ) * BOUNDS - vec2( burstPosX[i], - burstPosY[i] ) ) * PI / radius , 0.0, PI );
 					mousePhaseInf += clamp( peak * length( influence * ( ( uv - vec2( 0.5 ) ) * BOUNDS - vec2( burstPosX[i], - burstPosY[i] ) ) ) * PI / radius , 0.0, PI );
+
+					closestLength = min( length( ( uv - vec2( 0.5 ) ) * BOUNDS - vec2( burstPosX[i], - burstPosY[i] ) ) , closestLength);
+					
 				}
 
 				newHeight += ( cos( mousePhaseInf ) + 1.0 ) * 1.5;
+
+				if(closestLength < 10.0) 
+					heightmapValue.z = 300.0 * (10.0 - closestLength);
+				else
+					heightmapValue.z /= 1.2;
 
 				heightmapValue.y = heightmapValue.x;
 				heightmapValue.x = newHeight;
@@ -180,24 +191,49 @@
 
 		<script id="colorFragmentShader" type="x-shader/x-fragment">
 
+
 			varying vec3 vUv;
 			varying vec3 vUv_normal;
+			varying vec4 v_height;
 
 			uniform vec3 colorA; 
 			uniform vec3 colorB; 
 			uniform vec3 colorC; 
-			uniform vec3 colorD; 
+			uniform vec3 colorD;
 
 			void main()	{
 
-				if(vUv.z > 5.0 && abs(vUv_normal.x) < 0.9 )
+				int heightLevel = -1;
+
+
+				if(vUv.z > 5.0 && abs(vUv_normal.x) < 0.9 ) {
 					gl_FragColor = vec4(colorA, 1.0);
-				else if(vUv.z > 3.0)
+					heightLevel = 4;
+				}
+				else if(vUv.z > 3.0) {
 					gl_FragColor = vec4(colorB, 1.0);
-				else if(vUv.z > 1.0)
+					heightLevel = 3;
+				}
+				else if(vUv.z > 1.0) {
 					gl_FragColor = vec4(colorC, 1.0);
-				else
+					heightLevel = 2;
+				}
+				else {
 					gl_FragColor = vec4(colorD, 1.0);
+					heightLevel = 1;
+				}
+
+
+
+				if ((v_height.z > 10.0) && (heightLevel < 4))
+					gl_FragColor = vec4(colorA, 1.0);
+
+				else if ((v_height.z > 3.0) && (heightLevel < 4))
+					gl_FragColor = vec4(colorB, 1.0);
+
+				else if ((v_height.z > 1.0) && (heightLevel < 3))
+					gl_FragColor = vec4(colorC, 1.0);
+
 
 			}
 
@@ -213,6 +249,7 @@
 			varying vec3 vViewPosition;
 			varying vec3 vUv;
 			varying vec3 vUv_normal;
+			varying vec4 v_height;
 
 			#ifndef FLAT_SHADED
 
@@ -247,6 +284,7 @@
 					( texture2D( heightmap, uv + vec2( 0, - cellSize.y ) ).x - texture2D( heightmap, uv + vec2( 0, cellSize.y ) ).x ) * WIDTH / BOUNDS,
 					1.0 );
 				vUv_normal = objectNormal;
+				v_height = texture2D( heightmap, uv );
 				//<beginnormal_vertex>
 
 				#include <morphnormal_vertex>
@@ -325,6 +363,7 @@
 			var waterNormal = new THREE.Vector3();
 			var normalHelper;
 
+			var NUM_STREAMS = 100;
 			var NUM_SPHERES = 5;
 			var spheres = [];
 			var spheresEnabled = true;
@@ -571,12 +610,15 @@
 
 				var guide = []
 				guide.push( new THREE.Vector3( 0, 0, -1   ) )
-				guide.push( new THREE.Vector3( 0, 0, 1/4 ) )
-				guide.push( new THREE.Vector3( 0, 0, 1/2  ) ) 
+				guide.push( new THREE.Vector3( 1/2, 0, 1/4 ) )
+				guide.push( new THREE.Vector3( -1/2, 0, 1/2  ) ) 
 				guide.push( new THREE.Vector3( 0, 0, 1    ) )
 
-				
-				for(var i = -300; i < 300; i += 7) {
+				var streamLocMin = -300;
+				var streamLocMax = 300;
+				var streamLocStep = (streamLocMax - streamLocMin) / (NUM_STREAMS);
+
+				for(var i = streamLocMin + streamLocStep/2; i < streamLocMax; i += streamLocStep) {
 					var lifetime = 1*(Math.random() + 0.25)
 					var newStream = new Stream(scene, guide, lifetime, lifetime*Math.random(), i, BOUNDS, Math.random()+0.5 );
 					newStream.changeVisibility( effectController.burstPaths );
@@ -839,7 +881,7 @@
 						var burstPos = stream[i].update(time)
 						burstPosX.push( burstPos.x )
 						burstPosY.push( burstPos.z )
-						burstPosH.push( stream[i].getPeak() )
+						burstPosH.push( stream[i].getPeak() * stream[i].getPeak() * 1.5 )
 					}
 					
 					uniforms[ "burstPosX" ].value = burstPosX ;
