@@ -6,4 +6,4 @@ The Japanese Water Shader creates a new water shader based on the famous paintin
 
 Access the live online demo [here](https://cardadfar.github.io/japanese_water_shader/).
 
-Read the official paper [here](https://cardadfar.github.io/japanese_water_shader/).
+Read the official paper [here](https://cardadfar.github.io/japanese_water_shader/images/paper.pdf).
