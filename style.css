@@ -1,3 +1,42 @@
 body {
+    font-family: Monospace;
+    background-color: #f0f0f0;
     margin: 0px;
+    overflow: hidden;
+}
+
+.caption{
+    padding: 1rem;
+    color: white;
+    background: black;
+    font-size: 2rem;
+    text-align:center;
+}
+
+.info {
+    position: absolute;
+    background: rgba(0,0,0,0.3);
+    width: 250px;
+    padding: 0 10px 0 10px;
+    height: 100vh;
+    right: 0;
+    color: white;
+}
+
+.gui-space {
+    margin-top: 35px;
+}
+
+.title {
+    text-align:  center;
+    font-size: 15px;
+}
+
+.body {
+    margin-left: 10px;
+    font-size: 13px;
+}
+
+a {
+    color: white;
 }

@@ -1,12 +1,20 @@
  <!DOCTYPE html>
 <html lang="en">
 	<head>
-		<title>three.js webgl - gpgpu - water</title>
+		<title>Japanese Water Shader</title>
 		<meta charset="utf-8">
 		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
 		<link type="text/css" rel="stylesheet" href="style.css">
 	</head>
 	<body>
+
+		<div class=info>
+			<div class='gui-space'></div>
+			<p class=title>Japanese Water Shader</p>
+			<p class=body>Inspired by <a href='https://en.wikipedia.org/wiki/The_Great_Wave_off_Kanagawa' target="_blank">The Great Wave off Kanagawa</a> by <a href='https://en.wikipedia.org/wiki/Hokusai' target="_blank">Katsushika Hokusai</a>.</p>
+			<p class=body>Click 'Open Controls' at the top to open the controls GUI.</p>
+			<p class=body>Note that this demo works best in a Chrome browser.</p>
+		</div>
 
 		<script src="three.js"></script>
 		<script src="helpers/curve.js"></script>
@@ -429,6 +437,7 @@
 				window.addEventListener( 'resize', onWindowResize, false );
 
 				var gui = new GUI();
+				gui.close();
 
 				var valuesChanger = function () {
 
