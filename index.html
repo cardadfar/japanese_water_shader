@@ -17,7 +17,6 @@
 		</div>
 
 		<script src="three.js"></script>
-		<script src="helpers/curve.js"></script>
 		<script src="modules/OBJLoader.js"></script>
 
 
@@ -349,6 +348,12 @@
 			import { OBJLoader } from './modules/OBJLoader.js';
 
 
+			import { Stream } from './helpers/curve.js';
+
+
+
+
+
 			// Texture width for simulation
 			var WIDTH = 128;
 
@@ -399,7 +404,7 @@
 					wireframe: false,
 					burstPaths: false,
 					normals: false,
-					rigidShading: true,
+					rigidShading: false,
 					colorA: 0xffffff,
 					colorAB: 0x8dc3e3,
 					colorB: 0xacdbf7,

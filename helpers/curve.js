@@ -1,5 +1,7 @@
-class Stream {
+console.log('loaded');
 
+class Stream {
+    
     constructor(scene, guide, lifetime, starttime, x, bounds, peak) {
         /* curve - reference to curve
          * stream - reference to line
@@ -99,5 +101,6 @@ class Stream {
 
 }
 
+export { Stream };
 
 
